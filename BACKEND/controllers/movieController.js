@@ -158,6 +158,8 @@ exports.getMovies = async (req, res) => {
     const language = (req.query.language || '').trim();
     const country = (req.query.country || '').trim();
     const sort = (req.query.sort || 'year_desc').trim();
+    const page = Math.max(1, toNumber(req.query.page) || 1);
+    const limit = Math.min(40, Math.max(1, toNumber(req.query.limit) || 12));
     const fromYear = toNumber(req.query.fromYear);
     const toYear = toNumber(req.query.toYear);
     const minRuntime = toNumber(req.query.minRuntime);
@@ -208,11 +210,23 @@ exports.getMovies = async (req, res) => {
             if (maxRuntime) dbFilter.runtime.$lte = maxRuntime;
         }
 
+        const total = await Movie.countDocuments(dbFilter);
         const movies = await Movie.find(dbFilter)
             .sort(sortMap[sort] || sortMap.year_desc)
-            .limit(100);
+            .skip((page - 1) * limit)
+            .limit(limit);
 
-        return res.json(movies);
+        return res.json({
+            items: movies,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.max(1, Math.ceil(total / limit)),
+                hasNext: page * limit < total,
+                hasPrev: page > 1
+            }
+        });
     }
 
     const results = await omdbService.searchMovies(query);
@@ -271,7 +285,20 @@ exports.getMovies = async (req, res) => {
             }
         });
 
-    res.json(filteredMovies);
+    const total = filteredMovies.length;
+    const paginatedMovies = filteredMovies.slice((page - 1) * limit, page * limit);
+
+    res.json({
+        items: paginatedMovies,
+        pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.max(1, Math.ceil(total / limit)),
+            hasNext: page * limit < total,
+            hasPrev: page > 1
+        }
+    });
 };
 
 exports.getMovieYears = async (req, res) => {

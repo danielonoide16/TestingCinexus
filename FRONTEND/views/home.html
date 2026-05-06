@@ -24,7 +24,7 @@
 
     <div class="d-flex justify-content-center mt-3">
         <input id="searchInput" type="text" class="form-control w-50 me-2" placeholder="Search movie...">
-        <button class="btn btn-purple" onclick="renderMovies()">Search</button>
+        <button class="btn btn-purple" onclick="renderMovies(1)">Search</button>
     </div>
 </section>
 
@@ -40,7 +40,7 @@
     </div>
     <!-- FILTROS -->
     <div class="d-flex gap-3 mb-4 flex-wrap">
-        <select id="genreFilter" class="form-select w-auto" onchange="renderMovies()">
+        <select id="genreFilter" class="form-select w-auto" onchange="renderMovies(1)">
             <option value="">All Genres</option>
             <option value="Action">Action</option>
             <option value="Adventure">Adventure</option>
@@ -55,12 +55,18 @@
             <option value="Thriller">Thriller</option>
         </select>
 
-        <input id="yearFilter" type="number" min="1888" max="2100" class="form-control w-auto" value="2026" placeholder="Year" onchange="renderMovies()">
+        <input id="yearFilter" type="number" min="1888" max="2100" class="form-control w-auto" value="2026" placeholder="Year" onchange="renderMovies(1)">
     </div>
 
     <h3 class="mb-4">Recent Movies</h3>
 
     <div id="moviesContainer" class="row g-4"></div>
+
+    <div id="paginationContainer" class="d-flex justify-content-center align-items-center gap-3 mt-4 text-white">
+        <button id="prevPageBtn" class="btn btn-outline-light btn-sm" onclick="changePage(-1)">Previous</button>
+        <span id="pageInfo">Page 1</span>
+        <button id="nextPageBtn" class="btn btn-outline-light btn-sm" onclick="changePage(1)">Next</button>
+    </div>
 
 </div>
 
@@ -68,6 +74,8 @@
 <script>
 requireAuth();
 const user = JSON.parse(localStorage.getItem('user')) || {};
+let currentPage = 1;
+const PAGE_SIZE = 12;
 document.getElementById('navAvatar').textContent = getInitials(user.name);
 
 
@@ -98,7 +106,14 @@ async function filterValidImages(movies) {
     return checks.filter(Boolean);
 }
 
-async function renderMovies() {
+function updatePagination(pagination) {
+    document.getElementById('pageInfo').textContent = `Page ${pagination.page} of ${pagination.totalPages}`;
+    document.getElementById('prevPageBtn').disabled = !pagination.hasPrev;
+    document.getElementById('nextPageBtn').disabled = !pagination.hasNext;
+}
+
+async function renderMovies(page = 1) {
+    currentPage = page;
     const search = document.getElementById('searchInput').value.trim();
     const genre = document.getElementById('genreFilter').value;
     const year = document.getElementById('yearFilter').value.trim() || '2026';
@@ -111,6 +126,7 @@ async function renderMovies() {
         url += `fromYear=${encodeURIComponent(year)}&`;
         url += `toYear=${encodeURIComponent(year)}&`;
     }
+    url += `page=${encodeURIComponent(page)}&limit=${encodeURIComponent(PAGE_SIZE)}&`;
 
     ajax('GET', url, null, async function (data, status) {
         const container = document.getElementById('moviesContainer');
@@ -121,12 +137,16 @@ async function renderMovies() {
             return;
         }
 
-        if (!data.length) {
+        const movies = Array.isArray(data) ? data : (data.items || []);
+        const pagination = data.pagination || { page: 1, totalPages: 1, hasPrev: false, hasNext: false };
+
+        if (!movies.length) {
             container.innerHTML = "<p class='text-white'>No results</p>";
+            updatePagination(pagination);
             return;
         }
 
-        const validMovies = await filterValidImages(data);
+        const validMovies = await filterValidImages(movies);
 
         validMovies.forEach(m => {
             const posterUrl = m.poster || 'https://www.juliedray.com/wp-content/uploads/2022/01/sans-affiche.png';
@@ -143,7 +163,14 @@ async function renderMovies() {
             </div>
             `;
         });
+
+        updatePagination(pagination);
     });
+}
+
+function changePage(delta) {
+    const nextPage = Math.max(1, currentPage + delta);
+    renderMovies(nextPage);
 }
 
 function goToMovie(imdbID) {
