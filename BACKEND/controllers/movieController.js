@@ -1,5 +1,6 @@
 const Movie = require('../models/movieModel');
 const omdbService = require('../services/omdbService');
+const youtubeService = require('../services/youtubeService');
 
 
 const toNumber = (value) => {
@@ -419,5 +420,13 @@ exports.getMovieByImdbId = async (req, res) => {
         );
     }
 
-    res.json(movie);
+    const trailer = await youtubeService.searchTrailer({
+        title: movie.title,
+        year: movie.year
+    });
+
+    const payload = movie.toObject ? movie.toObject() : movie;
+    payload.trailer = trailer;
+
+    res.json(payload);
 };

@@ -32,13 +32,15 @@
             <div class="trailer-wrapper mt-3">
                 <div class="ratio ratio-16x9">
                     <iframe
-                        referrerpolicy="strict-origin-when-cross-origin" 
-                        src="https://www.youtube-nocookie.com/embed/m08TxIsFTRI" 
-                        title="Trailer" 
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                        id="trailerFrame"
+                        referrerpolicy="strict-origin-when-cross-origin"
+                        src=""
+                        title="Trailer"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                         allowfullscreen>
                     </iframe>
                 </div>
+                <small id="trailerMessage" class="text-secondary d-block mt-2"></small>
             </div>
 
             <div class="d-flex align-items-center gap-2 mt-3">
@@ -141,6 +143,16 @@ function loadMovieDetails() {
         document.getElementById('descripcion').textContent = movie.plot || 'No description available.';
         document.getElementById('poster').src = movie.poster || 'https://www.juliedray.com/wp-content/uploads/2022/01/sans-affiche.png';
         document.getElementById('poster').alt = tituloPelicula;
+
+        const trailerFrame = document.getElementById('trailerFrame');
+        const trailerMessage = document.getElementById('trailerMessage');
+        if (movie.trailer && movie.trailer.url) {
+            trailerFrame.src = movie.trailer.url;
+            trailerMessage.textContent = movie.trailer.title ? `Trailer: ${movie.trailer.title}` : '';
+        } else {
+            trailerFrame.removeAttribute('src');
+            trailerMessage.textContent = 'Trailer not available right now.';
+        }
 
         mostrarResenas();
     });
