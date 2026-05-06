@@ -24,11 +24,6 @@ const parseReleaseDate = (value) => {
     return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 };
 
-const YEAR_SEARCH_SEEDS = [
-    'the', 'love', 'man', 'girl', 'dark', 'last', 'first', 'day', 'night', 'life',
-    'world', 'dead', 'red', 'black', 'blue', 'king', 'war', 'fire', 'star', 'home',
-    'city', 'blood', 'moon', 'summer', 'winter', 'heart', 'boy', 'woman', 'time', 'house'
-];
 
 exports.createMovie = async (req, res) => {
     const payload = req.body;
@@ -201,20 +196,10 @@ exports.getMovies = async (req, res) => {
 
         if (exactYearMode) {
             const safePage = Math.min(5, page);
-            const uniqueCandidates = new Map();
+            const omdbPage = await omdbService.searchMoviesByYear(fromYear, safePage);
+            const savedMovies = [];
 
-            for (const seed of YEAR_SEARCH_SEEDS) {
-                const result = await omdbService.searchMovies(seed, { year: fromYear, type: 'movie', page: 1 });
-                for (const item of result.items) {
-                    if (item?.imdbID && !uniqueCandidates.has(item.imdbID)) {
-                        uniqueCandidates.set(item.imdbID, item);
-                    }
-                }
-                if (uniqueCandidates.size >= 80) break;
-            }
-
-            const enrichedMovies = [];
-            for (const m of uniqueCandidates.values()) {
+            for (const m of omdbPage.items) {
                 const details = await omdbService.getMovieByImdb(m.imdbID);
                 const movie = await Movie.findOneAndUpdate(
                     { imdbID: m.imdbID },
@@ -246,28 +231,22 @@ exports.getMovies = async (req, res) => {
                     },
                     { new: true, upsert: true, setDefaultsOnInsert: true }
                 );
-                enrichedMovies.push(movie);
+                savedMovies.push(movie);
             }
 
-            const filteredItems = enrichedMovies
-                .filter(movie => movie.poster)
-                .filter(movie => !genre || movie.genres.some(g => g.toLowerCase() === genre.toLowerCase()))
-                .sort((a, b) => {
-                    const titleCompare = String(a.title || '').localeCompare(String(b.title || ''));
-                    if (titleCompare !== 0) return titleCompare;
-                    return String(a.imdbID || '').localeCompare(String(b.imdbID || ''));
-                });
+            const filteredItems = savedMovies.filter(movie => {
+                const matchesGenre = !genre || movie.genres.some(g => g.toLowerCase() === genre.toLowerCase());
+                return matchesGenre;
+            });
 
-            const total = filteredItems.length;
-            const totalPages = Math.max(1, Math.min(5, Math.ceil(total / 10)));
-            const paginatedItems = filteredItems.slice((safePage - 1) * 10, safePage * 10);
+            const totalPages = Math.max(1, Math.min(5, Math.ceil((omdbPage.totalResults || 0) / 10)));
 
             return res.json({
-                items: paginatedItems,
+                items: filteredItems,
                 pagination: {
                     page: safePage,
                     limit: 10,
-                    total,
+                    total: omdbPage.totalResults || filteredItems.length,
                     totalPages,
                     hasNext: safePage < totalPages,
                     hasPrev: safePage > 1
