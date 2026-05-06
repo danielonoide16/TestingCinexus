@@ -153,15 +153,48 @@ exports.getRecentMovies = async (req, res) => {
 exports.getMovies = async (req, res) => {
     const query = (req.query.q || '').trim();
     const genre = (req.query.genre || '').trim();
+    const type = (req.query.type || '').trim().toLowerCase();
+    const rated = (req.query.rated || '').trim();
+    const language = (req.query.language || '').trim();
+    const country = (req.query.country || '').trim();
+    const sort = (req.query.sort || 'year_desc').trim();
     const fromYear = toNumber(req.query.fromYear);
     const toYear = toNumber(req.query.toYear);
+    const minRuntime = toNumber(req.query.minRuntime);
+    const maxRuntime = toNumber(req.query.maxRuntime);
+
+    const sortMap = {
+        year_desc: { year: -1, createdAt: -1 },
+        year_asc: { year: 1, createdAt: -1 },
+        title_asc: { title: 1 },
+        title_desc: { title: -1 },
+        rating_desc: { imdbRating: -1, year: -1 },
+        rating_asc: { imdbRating: 1, year: -1 },
+        runtime_desc: { runtime: -1, year: -1 },
+        runtime_asc: { runtime: 1, year: -1 }
+    };
+
+    const matchesMovie = (movie) => {
+        const matchesGenre = !genre || movie.genres.some(g => g.toLowerCase() === genre.toLowerCase());
+        const matchesType = !type || String(movie.type || '').toLowerCase() === type;
+        const matchesRated = !rated || String(movie.rated || '').toLowerCase() === rated.toLowerCase();
+        const matchesLanguage = !language || movie.languages.some(l => l.toLowerCase().includes(language.toLowerCase()));
+        const matchesCountry = !country || movie.countries.some(c => c.toLowerCase().includes(country.toLowerCase()));
+        const matchesFrom = !fromYear || (movie.year && movie.year >= fromYear);
+        const matchesTo = !toYear || (movie.year && movie.year <= toYear);
+        const matchesMinRuntime = !minRuntime || (movie.runtime && movie.runtime >= minRuntime);
+        const matchesMaxRuntime = !maxRuntime || (movie.runtime && movie.runtime <= maxRuntime);
+        return matchesGenre && matchesType && matchesRated && matchesLanguage && matchesCountry && matchesFrom && matchesTo && matchesMinRuntime && matchesMaxRuntime;
+    };
 
     if (!query) {
         const dbFilter = {};
 
-        if (genre) {
-            dbFilter.genres = { $regex: `^${genre}$`, $options: 'i' };
-        }
+        if (genre) dbFilter.genres = { $regex: `^${genre}$`, $options: 'i' };
+        if (type) dbFilter.type = type;
+        if (rated) dbFilter.rated = { $regex: `^${rated}$`, $options: 'i' };
+        if (language) dbFilter.languages = { $regex: language, $options: 'i' };
+        if (country) dbFilter.countries = { $regex: country, $options: 'i' };
 
         if (fromYear || toYear) {
             dbFilter.year = {};
@@ -169,9 +202,15 @@ exports.getMovies = async (req, res) => {
             if (toYear) dbFilter.year.$lte = toYear;
         }
 
+        if (minRuntime || maxRuntime) {
+            dbFilter.runtime = {};
+            if (minRuntime) dbFilter.runtime.$gte = minRuntime;
+            if (maxRuntime) dbFilter.runtime.$lte = maxRuntime;
+        }
+
         const movies = await Movie.find(dbFilter)
-            .sort({ year: -1, createdAt: -1 })
-            .limit(50);
+            .sort(sortMap[sort] || sortMap.year_desc)
+            .limit(100);
 
         return res.json(movies);
     }
@@ -206,7 +245,7 @@ exports.getMovies = async (req, res) => {
                 metascore: toNumber(details.Metascore),
                 imdbRating: toNumber(details.imdbRating),
                 imdbVotes: toNumber(details.imdbVotes),
-                type: details.Type || m.Type,
+                type: (details.Type || m.Type || 'movie').toLowerCase(),
                 imdbID: m.imdbID,
                 boxOffice: toNumber(details.BoxOffice)
             },
@@ -216,12 +255,21 @@ exports.getMovies = async (req, res) => {
         savedMovies.push(movie);
     }
 
-    const filteredMovies = savedMovies.filter(movie => {
-        const matchesGenre = !genre || movie.genres.some(g => g.toLowerCase() === genre.toLowerCase());
-        const matchesFrom = !fromYear || (movie.year && movie.year >= fromYear);
-        const matchesTo = !toYear || (movie.year && movie.year <= toYear);
-        return matchesGenre && matchesFrom && matchesTo;
-    });
+    const filteredMovies = savedMovies
+        .filter(matchesMovie)
+        .sort((a, b) => {
+            switch (sort) {
+                case 'year_asc': return (a.year || 0) - (b.year || 0);
+                case 'title_asc': return String(a.title || '').localeCompare(String(b.title || ''));
+                case 'title_desc': return String(b.title || '').localeCompare(String(a.title || ''));
+                case 'rating_desc': return (b.imdbRating || 0) - (a.imdbRating || 0);
+                case 'rating_asc': return (a.imdbRating || 0) - (b.imdbRating || 0);
+                case 'runtime_desc': return (b.runtime || 0) - (a.runtime || 0);
+                case 'runtime_asc': return (a.runtime || 0) - (b.runtime || 0);
+                case 'year_desc':
+                default: return (b.year || 0) - (a.year || 0);
+            }
+        });
 
     res.json(filteredMovies);
 };
