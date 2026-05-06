@@ -42,7 +42,7 @@
     <div class="d-flex gap-3 mb-4">
         <select id="genreFilter" class="form-select w-auto" onchange="renderMovies()">
             <option value="">All Genres</option>
-            <option value="Acción">Action</option>
+            <option value="Action">Action</option>
             <option value="Drama">Drama</option>
             <option value="Comedia">Comedy</option>
         </select>
@@ -67,50 +67,105 @@ requireAuth();
 const user = JSON.parse(localStorage.getItem('user')) || {};
 document.getElementById('navAvatar').textContent = getInitials(user.name);
 
-// DATA HARDCODEADA
-const movies = [
-    {title: "Project Hail Mary", genre: "Sci-fi", year: "2026", img: "https://m.media-amazon.com/images/M/MV5BNTkwNzJiYTctNzI3NC00NjE1LTlhYjktY2Q5MTdmMWFmNzcxXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg"},
-    {title: "Drama", genre: "Drama", year: "2026", img: "https://m.media-amazon.com/images/M/MV5BMTcwOGZhYmItYTg3ZS00NjUwLWJiMmQtMjU5YjEwYWY0NmNkXkEyXkFqcGc@._V1_.jpg"},
-    {title: "Mercy", genre: "Thriller", year: "2026", img: "https://www.sonypictures.co.uk/sites/unitedkingdom/files/2025-12/2717_SP_MERCY_Poster_1sheet_Dated_1mb.jpg"},
-    {title: "Zootopia 2", genre: "Comedy", year: "2025", img: "https://m.media-amazon.com/images/M/MV5BYjg1Mjc3MjQtMTZjNy00YWVlLWFhMWEtMWI3ZTgxYjJmNmRlXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg"},
-];
 
-// RENDER
-function renderMovies(){
-    const genre = document.getElementById('genreFilter').value;
-    const year = document.getElementById('yearFilter').value;
-    const search = document.getElementById('searchInput').value.toLowerCase();
+function loadImage(url) {
+    return new Promise(resolve => {
+        const img = new Image();
 
-    const container = document.getElementById('moviesContainer');
-    container.innerHTML = "";
+        img.onload = () => {
+            resolve(true);  
+        };
 
-    const filtered = movies.filter(m => {
-        return (!genre || m.genre === genre) &&
-               (!year || m.year === year) &&
-               (!search || m.title.toLowerCase().includes(search));
-    });
+        img.onerror = () => resolve(false);
 
-    if(filtered.length === 0){
-        container.innerHTML = "<p class='text-white'>No hay resultados</p>";
-        return;
-    }
-
-    filtered.forEach(m => {
-        container.innerHTML += `
-        <div class="col-md-3">
-            <div class="movie-card" onclick="window.location.href='movie_details.html?movie='+encodeURIComponent('${m.title}')">
-                <img src="${m.img}" class="w-100">
-                <div class="p-2 text-white">
-                    <strong>${m.title}</strong><br>
-                    <small>${m.genre} | ${m.year}</small>
-                </div>
-            </div>
-        </div>
-        `;
+        img.src = url;
     });
 }
 
+async function filterValidImages(movies) {
+    const checks = await Promise.all(
+        movies.map(async m => {
+            if (!m.poster) return null;
+
+            const isValid = await loadImage(m.poster);
+            return isValid ? m : null;
+        })
+    );
+
+    return checks.filter(Boolean);
+}
+
+function loadYears() {
+    ajax('GET', '/movies/years', null, function (data, status) {
+        if (status !== 200) return;
+
+        const select = document.getElementById('yearFilter');
+
+        data.forEach(year => {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            select.appendChild(option);
+        });
+    });
+}
+
+async function renderMovies() {
+    const search = document.getElementById('searchInput').value.trim();
+    const genre = document.getElementById('genreFilter').value;
+    const year = document.getElementById('yearFilter').value;
+
+    let url = '/movies?';
+
+    if (search) url += `q=${encodeURIComponent(search)}&`;
+    if (genre) url += `genre=${encodeURIComponent(genre)}&`;
+    if (year) url += `year=${encodeURIComponent(year)}&`;
+
+    if (!search && !genre && !year) {
+        url = '/movies/recent';
+    }
+
+    ajax('GET', url, null, async function (data, status) {
+        const container = document.getElementById('moviesContainer');
+        container.innerHTML = '';
+
+        if (status !== 200) {
+            container.innerHTML = "<p class='text-white'>Error loading movies</p>";
+            return;
+        }
+
+        if (!data.length) {
+            container.innerHTML = "<p class='text-white'>No results</p>";
+            return;
+        }
+
+        const validMovies = await filterValidImages(data);
+
+        validMovies.forEach(m => {
+            const posterUrl = m.poster || 'https://www.juliedray.com/wp-content/uploads/2022/01/sans-affiche.png';
+
+            container.innerHTML += `
+            <div class="col-md-3">
+                <div class="movie-card" onclick="goToMovie('${m.imdbID}')">
+                    <img src="${posterUrl}" class="w-100">
+                    <div class="p-2 text-white">
+                        <strong>${m.title}</strong><br>
+                        <small>${m.year || ''}</small>
+                    </div>
+                </div>
+            </div>
+            `;
+        });
+    });
+}
+
+function goToMovie(imdbID) {
+    window.location.href = 'movie_details.html?imdbID=' + imdbID;
+}
+
+
 // INIT
+loadYears();
 renderMovies();
 function goToProfile(){
     window.location.href = 'user_profile.html';
