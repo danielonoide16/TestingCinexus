@@ -152,11 +152,26 @@ exports.getRecentMovies = async (req, res) => {
 
 exports.getMovies = async (req, res) => {
     const query = (req.query.q || '').trim();
+    const genre = (req.query.genre || '').trim();
+    const fromYear = toNumber(req.query.fromYear);
+    const toYear = toNumber(req.query.toYear);
 
     if (!query) {
-        const movies = await Movie.find()
-            .sort({ year: -1 })   
-            .limit(20);
+        const dbFilter = {};
+
+        if (genre) {
+            dbFilter.genres = { $regex: `^${genre}$`, $options: 'i' };
+        }
+
+        if (fromYear || toYear) {
+            dbFilter.year = {};
+            if (fromYear) dbFilter.year.$gte = fromYear;
+            if (toYear) dbFilter.year.$lte = toYear;
+        }
+
+        const movies = await Movie.find(dbFilter)
+            .sort({ year: -1, createdAt: -1 })
+            .limit(50);
 
         return res.json(movies);
     }
@@ -165,25 +180,58 @@ exports.getMovies = async (req, res) => {
     const savedMovies = [];
 
     for (const m of results) {
+        const details = await omdbService.getMovieByImdb(m.imdbID);
+
         const movie = await Movie.findOneAndUpdate(
             { imdbID: m.imdbID },
             {
-                title: m.Title,
-                year: toNumber(m.Year),
-                poster: m.Poster,
-                type: m.Type,
-                imdbID: m.imdbID
+                title: details.Title || m.Title,
+                year: toNumber(details.Year || m.Year),
+                rated: details.Rated,
+                released: parseReleaseDate(details.Released),
+                runtime: toNumber(details.Runtime),
+                genres: splitList(details.Genre),
+                directors: splitList(details.Director),
+                writers: splitList(details.Writer),
+                actors: splitList(details.Actors),
+                plot: details.Plot,
+                languages: splitList(details.Language),
+                countries: splitList(details.Country),
+                awards: details.Awards,
+                poster: fixPoster(details.Poster || m.Poster),
+                ratings: (details.Ratings || []).map(rating => ({
+                    source: rating.Source,
+                    value: rating.Value
+                })),
+                metascore: toNumber(details.Metascore),
+                imdbRating: toNumber(details.imdbRating),
+                imdbVotes: toNumber(details.imdbVotes),
+                type: details.Type || m.Type,
+                imdbID: m.imdbID,
+                boxOffice: toNumber(details.BoxOffice)
             },
-            { new: true, upsert: true }
+            { new: true, upsert: true, setDefaultsOnInsert: true }
         );
 
         savedMovies.push(movie);
     }
 
-    res.json(savedMovies);
+    const filteredMovies = savedMovies.filter(movie => {
+        const matchesGenre = !genre || movie.genres.some(g => g.toLowerCase() === genre.toLowerCase());
+        const matchesFrom = !fromYear || (movie.year && movie.year >= fromYear);
+        const matchesTo = !toYear || (movie.year && movie.year <= toYear);
+        return matchesGenre && matchesFrom && matchesTo;
+    });
+
+    res.json(filteredMovies);
 };
 
+exports.getMovieYears = async (req, res) => {
+    const years = await Movie.distinct('year', { year: { $ne: null } });
+    res.json(years.filter(Boolean).sort((a, b) => b - a));
+};
 
+exports.searchMovies = async (req, res) => exports.getMovies(req, res);
 
 exports.getMovieById = async (req, res) => {
     const movie = await Movie.findById(req.params.id);
@@ -192,7 +240,46 @@ exports.getMovieById = async (req, res) => {
 };
 
 exports.getMovieByImdbId = async (req, res) => {
-    const movie = await Movie.findOne({ imdbID: req.params.imdbID });
-    if (!movie) return res.status(404).json({ error: 'Movie not found' });
+    let movie = await Movie.findOne({ imdbID: req.params.imdbID });
+
+    if (!movie || !movie.plot || !movie.genres?.length) {
+        const details = await omdbService.getMovieByImdb(req.params.imdbID);
+
+        if (!details || details.Response === 'False') {
+            return res.status(404).json({ error: 'Movie not found' });
+        }
+
+        movie = await Movie.findOneAndUpdate(
+            { imdbID: req.params.imdbID },
+            {
+                title: details.Title,
+                year: toNumber(details.Year),
+                rated: details.Rated,
+                released: parseReleaseDate(details.Released),
+                runtime: toNumber(details.Runtime),
+                genres: splitList(details.Genre),
+                directors: splitList(details.Director),
+                writers: splitList(details.Writer),
+                actors: splitList(details.Actors),
+                plot: details.Plot,
+                languages: splitList(details.Language),
+                countries: splitList(details.Country),
+                awards: details.Awards,
+                poster: fixPoster(details.Poster),
+                ratings: (details.Ratings || []).map(rating => ({
+                    source: rating.Source,
+                    value: rating.Value
+                })),
+                metascore: toNumber(details.Metascore),
+                imdbRating: toNumber(details.imdbRating),
+                imdbVotes: toNumber(details.imdbVotes),
+                imdbID: details.imdbID,
+                type: details.Type || 'movie',
+                boxOffice: toNumber(details.BoxOffice)
+            },
+            { new: true, upsert: true, setDefaultsOnInsert: true }
+        );
+    }
+
     res.json(movie);
 };

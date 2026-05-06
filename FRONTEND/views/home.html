@@ -39,20 +39,24 @@
         <p class="mb-0">Filters</p>
     </div>
     <!-- FILTROS -->
-    <div class="d-flex gap-3 mb-4">
+    <div class="d-flex gap-3 mb-4 flex-wrap">
         <select id="genreFilter" class="form-select w-auto" onchange="renderMovies()">
             <option value="">All Genres</option>
             <option value="Action">Action</option>
+            <option value="Adventure">Adventure</option>
+            <option value="Animation">Animation</option>
+            <option value="Comedy">Comedy</option>
+            <option value="Crime">Crime</option>
             <option value="Drama">Drama</option>
-            <option value="Comedia">Comedy</option>
+            <option value="Fantasy">Fantasy</option>
+            <option value="Horror">Horror</option>
+            <option value="Romance">Romance</option>
+            <option value="Sci-Fi">Sci-Fi</option>
+            <option value="Thriller">Thriller</option>
         </select>
 
-        <select id="yearFilter" class="form-select w-auto" onchange="renderMovies()">
-            <option value="">All Years</option>
-            <option value="2024">2024</option>
-            <option value="2023">2023</option>
-            <option value="2022">2022</option>
-        </select>
+        <input id="fromYearFilter" type="number" min="1888" max="2100" class="form-control w-auto" placeholder="From year" onchange="renderMovies()">
+        <input id="toYearFilter" type="number" min="1888" max="2100" class="form-control w-auto" placeholder="To year" onchange="renderMovies()">
     </div>
 
     <h3 class="mb-4">Recent Movies</h3>
@@ -95,33 +99,20 @@ async function filterValidImages(movies) {
     return checks.filter(Boolean);
 }
 
-function loadYears() {
-    ajax('GET', '/movies/years', null, function (data, status) {
-        if (status !== 200) return;
-
-        const select = document.getElementById('yearFilter');
-
-        data.forEach(year => {
-            const option = document.createElement('option');
-            option.value = year;
-            option.textContent = year;
-            select.appendChild(option);
-        });
-    });
-}
-
 async function renderMovies() {
     const search = document.getElementById('searchInput').value.trim();
     const genre = document.getElementById('genreFilter').value;
-    const year = document.getElementById('yearFilter').value;
+    const fromYear = document.getElementById('fromYearFilter').value.trim();
+    const toYear = document.getElementById('toYearFilter').value.trim();
 
     let url = '/movies?';
 
     if (search) url += `q=${encodeURIComponent(search)}&`;
     if (genre) url += `genre=${encodeURIComponent(genre)}&`;
-    if (year) url += `year=${encodeURIComponent(year)}&`;
+    if (fromYear) url += `fromYear=${encodeURIComponent(fromYear)}&`;
+    if (toYear) url += `toYear=${encodeURIComponent(toYear)}&`;
 
-    if (!search && !genre && !year) {
+    if (!search && !genre && !fromYear && !toYear) {
         url = '/movies/recent';
     }
 
@@ -165,7 +156,6 @@ function goToMovie(imdbID) {
 
 
 // INIT
-loadYears();
 renderMovies();
 function goToProfile(){
     window.location.href = 'user_profile.html';

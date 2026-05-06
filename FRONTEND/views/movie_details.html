@@ -74,6 +74,7 @@
 
 <footer class="text-center py-3"><small>&copy; 2026 Cinexus - All rights reserved</small></footer>
 
+<script src="../controllers/api.js"></script>
 <script>
 const usuario = JSON.parse(localStorage.getItem('user'));
 if (!usuario) window.location.href = 'login-register.html';
@@ -90,39 +91,8 @@ function getInitials(name) {
 
 document.getElementById('navAvatar').textContent = getInitials(usuario.name);
 
-// Hardcoded movies
-const peliculas = {
-    "Project Hail Mary": {
-        genero: "Sci-fi", anio: "2026",
-        img: "https://m.media-amazon.com/images/M/MV5BNTkwNzJiYTctNzI3NC00NjE1LTlhYjktY2Q5MTdmMWFmNzcxXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
-        desc: "A lone astronaut must save the Earth in this sci-fi adventure based on Andy Weir's novel."
-    },
-    "Drama": {
-        genero: "Drama", anio: "2026",
-        img: "https://m.media-amazon.com/images/M/MV5BMTcwOGZhYmItYTg3ZS00NjUwLWJiMmQtMjU5YjEwYWY0NmNkXkEyXkFqcGc@._V1_.jpg",
-        desc: "A powerful drama about the complexities of human relationships."
-    },
-    "Mercy": {
-        genero: "Thriller", anio: "2026",
-        img: "https://www.sonypictures.co.uk/sites/unitedkingdom/files/2025-12/2717_SP_MERCY_Poster_1sheet_Dated_1mb.jpg",
-        desc: "A tense thriller that keeps you on the edge of your seat from start to finish."
-    },
-    "Zootopia 2": {
-        genero: "Comedy", anio: "2025",
-        img: "https://m.media-amazon.com/images/M/MV5BYjg1Mjc3MjQtMTZjNy00YWVlLWFhMWEtMWI3ZTgxYjJmNmRlXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
-        desc: "Judy and Nick are back in a brand-new adventure through the animal metropolis of Zootopia."
-    },
-    "The Shawshank Redemption": {
-        genero: "Drama", anio: "1994",
-        img: "https://m.media-amazon.com/images/M/MV5BMDAyY2FhYjctNDc5OS00MDNlLThiMGUtY2UxYWVkNGY2ZjljXkEyXkFqcGc@._V1_.jpg",
-        desc: "Two imprisoned men bond over the years, finding solace and redemption."
-    },
-    "The Dark Knight": {
-        genero: "Action", anio: "2008",
-        img: "https://m.media-amazon.com/images/M/MV5BMTMxNTMwODM0NF5BMl5BanBnXkFtZTcwODAyMTk2Mw@@._V1_.jpg",
-        desc: "Batman faces the Joker in what is considered the greatest superhero movie ever made."
-    }
-};
+const imdbID = new URLSearchParams(location.search).get('imdbID');
+let tituloPelicula = '';
 
 // Hardcoded reviews
 const resenas = {
@@ -142,13 +112,39 @@ const resenas = {
     ]
 };
 
-const tituloPelicula = decodeURIComponent(new URLSearchParams(location.search).get('movie') || 'Project Hail Mary');
-const pelicula = peliculas[tituloPelicula] || peliculas["Project Hail Mary"];
+function formatMovieMeta(movie) {
+    const parts = [];
+    if (movie.genres && movie.genres.length) parts.push(movie.genres.join(', '));
+    if (movie.year) parts.push(movie.year);
+    if (movie.rated) parts.push(movie.rated);
+    if (movie.runtime) parts.push(`${movie.runtime} min`);
+    return parts.join(' | ');
+}
 
-document.getElementById('titulo').textContent      = tituloPelicula;
-document.getElementById('meta').textContent        = pelicula.genero + ' | ' + pelicula.anio;
-document.getElementById('descripcion').textContent = pelicula.desc;
-document.getElementById('poster').src              = pelicula.img;
+function loadMovieDetails() {
+    if (!imdbID) {
+        document.getElementById('titulo').textContent = 'Movie not found';
+        document.getElementById('descripcion').textContent = 'Missing imdbID in URL.';
+        return;
+    }
+
+    ajax('GET', `/movies/imdb/${encodeURIComponent(imdbID)}`, null, function (movie, status) {
+        if (status !== 200) {
+            document.getElementById('titulo').textContent = 'Movie not found';
+            document.getElementById('descripcion').textContent = 'Could not load movie details.';
+            return;
+        }
+
+        tituloPelicula = movie.title || 'Unknown movie';
+        document.getElementById('titulo').textContent = tituloPelicula;
+        document.getElementById('meta').textContent = formatMovieMeta(movie);
+        document.getElementById('descripcion').textContent = movie.plot || 'No description available.';
+        document.getElementById('poster').src = movie.poster || 'https://www.juliedray.com/wp-content/uploads/2022/01/sans-affiche.png';
+        document.getElementById('poster').alt = tituloPelicula;
+
+        mostrarResenas();
+    });
+}
 
 // Star selector
 let estrellasSeleccionadas = 0;
@@ -165,6 +161,7 @@ function resaltarEstrellas(n) {
 
 function publicarResena() {
     const texto = document.getElementById('textoResena').value.trim();
+    if (!tituloPelicula) { alert('Movie details are still loading.'); return; }
     if (!estrellasSeleccionadas || !texto) { alert('Select a rating and write a review.'); return; }
     if (!resenas[tituloPelicula]) resenas[tituloPelicula] = [];
     resenas[tituloPelicula].unshift({ usuario: usuario.name, estrellas: estrellasSeleccionadas, texto, fecha: new Date().toLocaleDateString() });
@@ -192,14 +189,14 @@ function mostrarResenas() {
 
 function agregarALista() {
     const select = document.getElementById('selectLista');
-    if (!select.value) return;
+    if (!select.value || !tituloPelicula) return;
     document.getElementById('mensajeLista').textContent = '"' + tituloPelicula + '" added to "' + select.selectedOptions[0].text + '"';
     setTimeout(() => document.getElementById('mensajeLista').textContent = '', 3000);
 }
 
 function cerrarSesion() { localStorage.removeItem('user'); window.location.href = 'login-register.html'; }
 
-mostrarResenas();
+loadMovieDetails();
 </script>
 </body>
 </html>
