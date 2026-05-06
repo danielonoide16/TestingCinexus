@@ -100,7 +100,7 @@ exports.getRecentMovies = async (req, res) => {
         // we get the first 3 pages of results (up to 30 movies) to increase chances of finding valid posters
         for (let page = 1; page <= 3; page++) {
             const results = await omdbService.searchMoviesByYear(currentYear, page);
-            allResults = allResults.concat(results);
+            allResults = allResults.concat(results.items);
         }
 
         const savedMovies = [];
@@ -190,6 +190,69 @@ exports.getMovies = async (req, res) => {
     };
 
     if (!query) {
+        const exactYearMode = fromYear && toYear && fromYear === toYear;
+
+        if (exactYearMode) {
+            const safePage = Math.min(5, page);
+            const omdbPage = await omdbService.searchMoviesByYear(fromYear, safePage);
+            const totalPages = Math.max(1, Math.min(5, Math.ceil((omdbPage.totalResults || 0) / 10)));
+            const savedMovies = [];
+
+            for (const m of omdbPage.items) {
+                const details = await omdbService.getMovieByImdb(m.imdbID);
+
+                const movie = await Movie.findOneAndUpdate(
+                    { imdbID: m.imdbID },
+                    {
+                        title: details.Title || m.Title,
+                        year: toNumber(details.Year || m.Year),
+                        rated: details.Rated,
+                        released: parseReleaseDate(details.Released),
+                        runtime: toNumber(details.Runtime),
+                        genres: splitList(details.Genre),
+                        directors: splitList(details.Director),
+                        writers: splitList(details.Writer),
+                        actors: splitList(details.Actors),
+                        plot: details.Plot,
+                        languages: splitList(details.Language),
+                        countries: splitList(details.Country),
+                        awards: details.Awards,
+                        poster: fixPoster(details.Poster || m.Poster),
+                        ratings: (details.Ratings || []).map(rating => ({
+                            source: rating.Source,
+                            value: rating.Value
+                        })),
+                        metascore: toNumber(details.Metascore),
+                        imdbRating: toNumber(details.imdbRating),
+                        imdbVotes: toNumber(details.imdbVotes),
+                        type: (details.Type || m.Type || 'movie').toLowerCase(),
+                        imdbID: m.imdbID,
+                        boxOffice: toNumber(details.BoxOffice)
+                    },
+                    { new: true, upsert: true, setDefaultsOnInsert: true }
+                );
+
+                savedMovies.push(movie);
+            }
+
+            const filteredItems = savedMovies.filter(movie => {
+                const matchesGenre = !genre || movie.genres.some(g => g.toLowerCase() === genre.toLowerCase());
+                return matchesGenre;
+            });
+
+            return res.json({
+                items: filteredItems,
+                pagination: {
+                    page: safePage,
+                    limit: 10,
+                    total: omdbPage.totalResults || filteredItems.length,
+                    totalPages,
+                    hasNext: safePage < totalPages,
+                    hasPrev: safePage > 1
+                }
+            });
+        }
+
         const dbFilter = {};
 
         if (genre) dbFilter.genres = { $regex: `^${genre}$`, $options: 'i' };

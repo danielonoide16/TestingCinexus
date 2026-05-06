@@ -8,14 +8,24 @@ exports.searchMoviesByYear = async (year, page = 1) => {
     const res = await axios.get(BASE_URL, {
         params: {
             apikey: API_KEY,
-            s: 'movie',   
+            s: 'movie',
+            type: 'movie',
             y: year,
             page
         }
     });
 
-    if (res.data.Response === 'False') return [];
-    return res.data.Search;
+    if (res.data.Response === 'False') {
+        return {
+            items: [],
+            totalResults: 0
+        };
+    }
+
+    return {
+        items: res.data.Search || [],
+        totalResults: Number(res.data.totalResults || 0)
+    };
 };
 
 
