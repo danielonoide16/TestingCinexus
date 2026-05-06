@@ -55,41 +55,7 @@
             <option value="Thriller">Thriller</option>
         </select>
 
-        <select id="typeFilter" class="form-select w-auto" onchange="renderMovies()">
-            <option value="">All types</option>
-            <option value="movie">Movie</option>
-            <option value="series">Series</option>
-            <option value="episode">Episode</option>
-        </select>
-
-        <select id="ratedFilter" class="form-select w-auto" onchange="renderMovies()">
-            <option value="">All ratings</option>
-            <option value="G">G</option>
-            <option value="PG">PG</option>
-            <option value="PG-13">PG-13</option>
-            <option value="R">R</option>
-            <option value="NC-17">NC-17</option>
-            <option value="TV-14">TV-14</option>
-            <option value="TV-MA">TV-MA</option>
-        </select>
-
-        <input id="languageFilter" type="text" class="form-control w-auto" placeholder="Language" onchange="renderMovies()">
-        <input id="countryFilter" type="text" class="form-control w-auto" placeholder="Country" onchange="renderMovies()">
-        <input id="fromYearFilter" type="number" min="1888" max="2100" class="form-control w-auto" placeholder="From year" onchange="renderMovies()">
-        <input id="toYearFilter" type="number" min="1888" max="2100" class="form-control w-auto" placeholder="To year" onchange="renderMovies()">
-        <input id="minRuntimeFilter" type="number" min="1" max="500" class="form-control w-auto" placeholder="Min runtime" onchange="renderMovies()">
-        <input id="maxRuntimeFilter" type="number" min="1" max="500" class="form-control w-auto" placeholder="Max runtime" onchange="renderMovies()">
-
-        <select id="sortFilter" class="form-select w-auto" onchange="renderMovies()">
-            <option value="year_desc">Newest first</option>
-            <option value="year_asc">Oldest first</option>
-            <option value="title_asc">Title A-Z</option>
-            <option value="title_desc">Title Z-A</option>
-            <option value="rating_desc">IMDb rating high-low</option>
-            <option value="rating_asc">IMDb rating low-high</option>
-            <option value="runtime_desc">Runtime long-short</option>
-            <option value="runtime_asc">Runtime short-long</option>
-        </select>
+        <input id="yearFilter" type="number" min="1888" max="2100" class="form-control w-auto" value="2026" placeholder="Year" onchange="renderMovies()">
     </div>
 
     <h3 class="mb-4">Recent Movies</h3>
@@ -135,32 +101,15 @@ async function filterValidImages(movies) {
 async function renderMovies() {
     const search = document.getElementById('searchInput').value.trim();
     const genre = document.getElementById('genreFilter').value;
-    const type = document.getElementById('typeFilter').value;
-    const rated = document.getElementById('ratedFilter').value;
-    const language = document.getElementById('languageFilter').value.trim();
-    const country = document.getElementById('countryFilter').value.trim();
-    const fromYear = document.getElementById('fromYearFilter').value.trim();
-    const toYear = document.getElementById('toYearFilter').value.trim();
-    const minRuntime = document.getElementById('minRuntimeFilter').value.trim();
-    const maxRuntime = document.getElementById('maxRuntimeFilter').value.trim();
-    const sort = document.getElementById('sortFilter').value;
+    const year = document.getElementById('yearFilter').value.trim() || '2026';
 
     let url = '/movies?';
 
     if (search) url += `q=${encodeURIComponent(search)}&`;
     if (genre) url += `genre=${encodeURIComponent(genre)}&`;
-    if (type) url += `type=${encodeURIComponent(type)}&`;
-    if (rated) url += `rated=${encodeURIComponent(rated)}&`;
-    if (language) url += `language=${encodeURIComponent(language)}&`;
-    if (country) url += `country=${encodeURIComponent(country)}&`;
-    if (fromYear) url += `fromYear=${encodeURIComponent(fromYear)}&`;
-    if (toYear) url += `toYear=${encodeURIComponent(toYear)}&`;
-    if (minRuntime) url += `minRuntime=${encodeURIComponent(minRuntime)}&`;
-    if (maxRuntime) url += `maxRuntime=${encodeURIComponent(maxRuntime)}&`;
-    if (sort) url += `sort=${encodeURIComponent(sort)}&`;
-
-    if (!search && !genre && !type && !rated && !language && !country && !fromYear && !toYear && !minRuntime && !maxRuntime && sort === 'year_desc') {
-        url = '/movies/recent';
+    if (year) {
+        url += `fromYear=${encodeURIComponent(year)}&`;
+        url += `toYear=${encodeURIComponent(year)}&`;
     }
 
     ajax('GET', url, null, async function (data, status) {
