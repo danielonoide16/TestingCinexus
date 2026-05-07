@@ -293,7 +293,16 @@ exports.getMovies = async (req, res) => {
         });
     }
 
-    const results = await omdbService.searchMovies(query);
+    const searchOptions = {
+        page,
+        type: 'movie'
+    };
+
+    if (fromYear && toYear && fromYear === toYear) {
+        searchOptions.year = fromYear;
+    }
+
+    const results = await omdbService.searchMovies(query, searchOptions);
     const savedMovies = [];
 
     for (const m of results.items) {
@@ -349,17 +358,16 @@ exports.getMovies = async (req, res) => {
             }
         });
 
-    const total = filteredMovies.length;
-    const paginatedMovies = filteredMovies.slice((page - 1) * limit, page * limit);
+    const total = genre ? filteredMovies.length : (results.totalResults || filteredMovies.length);
 
     res.json({
-        items: paginatedMovies,
+        items: filteredMovies,
         pagination: {
             page,
             limit,
             total,
             totalPages: Math.max(1, Math.ceil(total / limit)),
-            hasNext: page * limit < total,
+            hasNext: page < Math.max(1, Math.ceil(total / limit)),
             hasPrev: page > 1
         }
     });
