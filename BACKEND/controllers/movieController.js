@@ -162,8 +162,7 @@ exports.getMovies = async (req, res) => {
     const sort = (req.query.sort || 'year_desc').trim();
     const page = Math.max(1, toNumber(req.query.page) || 1);
     const limit = Math.min(40, Math.max(1, toNumber(req.query.limit) || 12));
-    const fromYear = toNumber(req.query.fromYear);
-    const toYear = toNumber(req.query.toYear);
+    const year = toNumber(req.query.year);
     const minRuntime = toNumber(req.query.minRuntime);
     const maxRuntime = toNumber(req.query.maxRuntime);
 
@@ -184,19 +183,16 @@ exports.getMovies = async (req, res) => {
         const matchesRated = !rated || String(movie.rated || '').toLowerCase() === rated.toLowerCase();
         const matchesLanguage = !language || movie.languages.some(l => l.toLowerCase().includes(language.toLowerCase()));
         const matchesCountry = !country || movie.countries.some(c => c.toLowerCase().includes(country.toLowerCase()));
-        const matchesFrom = !fromYear || (movie.year && movie.year >= fromYear);
-        const matchesTo = !toYear || (movie.year && movie.year <= toYear);
+        const matchesYear = !year || movie.year === year;
         const matchesMinRuntime = !minRuntime || (movie.runtime && movie.runtime >= minRuntime);
         const matchesMaxRuntime = !maxRuntime || (movie.runtime && movie.runtime <= maxRuntime);
-        return matchesGenre && matchesType && matchesRated && matchesLanguage && matchesCountry && matchesFrom && matchesTo && matchesMinRuntime && matchesMaxRuntime;
+        return matchesGenre && matchesType && matchesRated && matchesLanguage && matchesCountry && matchesYear && matchesMinRuntime && matchesMaxRuntime;
     };
 
     if (!query) {
-        const exactYearMode = fromYear && toYear && fromYear === toYear;
-
-        if (exactYearMode) {
+        if (year) {
             const safePage = Math.min(5, page);
-            const omdbPage = await omdbService.searchMoviesByYear(fromYear, safePage);
+            const omdbPage = await omdbService.searchMoviesByYear(year, safePage);
             const savedMovies = [];
 
             for (const m of omdbPage.items) {
@@ -262,11 +258,7 @@ exports.getMovies = async (req, res) => {
         if (language) dbFilter.languages = { $regex: language, $options: 'i' };
         if (country) dbFilter.countries = { $regex: country, $options: 'i' };
 
-        if (fromYear || toYear) {
-            dbFilter.year = {};
-            if (fromYear) dbFilter.year.$gte = fromYear;
-            if (toYear) dbFilter.year.$lte = toYear;
-        }
+        if (year) dbFilter.year = year;
 
         if (minRuntime || maxRuntime) {
             dbFilter.runtime = {};
@@ -298,9 +290,7 @@ exports.getMovies = async (req, res) => {
         type: 'movie'
     };
 
-    if (fromYear && toYear && fromYear === toYear) {
-        searchOptions.year = fromYear;
-    }
+    if (year) searchOptions.year = year;
 
     const results = await omdbService.searchMovies(query, searchOptions);
     const savedMovies = [];

@@ -145,8 +145,7 @@ async function renderMovies(page = 1) {
     if (search) url += `q=${encodeURIComponent(search)}&`;
     if (genre) url += `genre=${encodeURIComponent(genre)}&`;
     if (year && year !== 'all') {
-        url += `fromYear=${encodeURIComponent(year)}&`;
-        url += `toYear=${encodeURIComponent(year)}&`;
+        url += `year=${encodeURIComponent(year)}&`;
     }
     url += `page=${encodeURIComponent(page)}&limit=${encodeURIComponent(PAGE_SIZE)}&`;
 
