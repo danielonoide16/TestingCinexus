@@ -174,7 +174,7 @@ async function renderMovies(page = 1) {
 
             container.innerHTML += `
             <div class="col-md-3">
-                <div class="movie-card" onclick="goToMovie('${m.imdbID}')">
+                <div class="movie-card" onclick="goToMovie('${m.tmdbId || ''}')">
                     <img src="${posterUrl}" class="w-100">
                     <div class="p-2 text-white">
                         <strong>${m.title}</strong><br>
@@ -194,8 +194,9 @@ function changePage(delta) {
     renderMovies(nextPage);
 }
 
-function goToMovie(imdbID) {
-    window.location.href = 'movie_details.html?imdbID=' + imdbID;
+function goToMovie(tmdbId) {
+    if (!tmdbId) return;
+    window.location.href = 'movie_details.html?tmdbId=' + tmdbId;
 }
 
 

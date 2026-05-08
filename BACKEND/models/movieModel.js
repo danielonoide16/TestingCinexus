@@ -92,6 +92,24 @@ const movieSchema = new mongoose.Schema(
             sparse: true,
             trim: true
         },
+        tmdbId: {
+            type: Number,
+            unique: true,
+            sparse: true
+        },
+        backdrop: {
+            type: String,
+            default: ''
+        },
+        popularity: {
+            type: Number
+        },
+        voteAverage: {
+            type: Number
+        },
+        voteCount: {
+            type: Number
+        },
         type: {
             type: String,
             default: 'movie'

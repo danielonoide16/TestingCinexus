@@ -93,7 +93,7 @@ function getInitials(name) {
 
 document.getElementById('navAvatar').textContent = getInitials(usuario.name);
 
-const imdbID = new URLSearchParams(location.search).get('imdbID');
+const tmdbId = new URLSearchParams(location.search).get('tmdbId');
 let tituloPelicula = '';
 
 // Hardcoded reviews
@@ -124,13 +124,13 @@ function formatMovieMeta(movie) {
 }
 
 function loadMovieDetails() {
-    if (!imdbID) {
+    if (!tmdbId) {
         document.getElementById('titulo').textContent = 'Movie not found';
-        document.getElementById('descripcion').textContent = 'Missing imdbID in URL.';
+        document.getElementById('descripcion').textContent = 'Missing tmdbId in URL.';
         return;
     }
 
-    ajax('GET', `/movies/imdb/${encodeURIComponent(imdbID)}`, null, function (movie, status) {
+    ajax('GET', `/movies/tmdb/${encodeURIComponent(tmdbId)}`, null, function (movie, status) {
         if (status !== 200) {
             document.getElementById('titulo').textContent = 'Movie not found';
             document.getElementById('descripcion').textContent = 'Could not load movie details.';

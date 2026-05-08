@@ -8,6 +8,7 @@ router.get('/search', (req, res, next) => movieController.searchMovies(req, res)
 router.get('/years', (req, res, next) => movieController.getMovieYears(req, res).catch(next));
 router.get('/', (req, res, next) => movieController.getMovies(req, res).catch(next));
 router.get('/imdb/:imdbID', (req, res, next) => movieController.getMovieByImdbId(req, res).catch(next));
+router.get('/tmdb/:tmdbId', (req, res, next) => movieController.getMovieByTmdbId(req, res).catch(next));
 router.get('/:id', (req, res, next) => movieController.getMovieById(req, res).catch(next));
 router.post('/', auth, (req, res, next) => movieController.createMovie(req, res).catch(next));
 
